@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RISKOPOLY - Gestión de Riesgos Multiequipo</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Iconos de Font Awesome para el dado y el tablero -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate oscuro para fondo */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .game-container {
+            max-width: 1400px;
+            width: 100%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+        @media (min-width: 1024px) {
+            .game-container {
+                /* Distribución más ancha para el tablero */
+                grid-template-columns: 3fr 1fr; 
+            }
+        }
+        .board-tile {
+            /* Aumento de tamaño para mejor visibilidad */
+            width: 45px; /* Ligeramente más grande */
+            height: 45px;
+            border-radius: 8px; /* Bordes más redondeados */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: white;
+            position: relative;
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .board-tile i {
+            font-size: 1.4rem;
+            margin-bottom: 2px;
+        }
+        .board-tile:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+        .board-path {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px; /* Espaciado ajustado */
+            padding: 1.5rem;
+            background-color: #1e293b; /* Color de tablero */
+            border-radius: 0.75rem;
+        }
+        .team-marker {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 3px solid white;
+            transition: all 0.5s ease;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+        }
+        /* Colores de Marcador */
+        .marker-team-0 { background-color: #f87171; top: -6px; left: -6px; } /* Rojo */
+        .marker-team-1 { background-color: #34d399; top: -6px; right: -6px; } /* Esmeralda */
+        .marker-team-2 { background-color: #60a5fa; bottom: -6px; left: -6px; } /* Azul */
+        .marker-team-3 { background-color: #facc15; bottom: -6px; right: -6px; } /* Amarillo */
+
+        /* Estilos del Log de Eventos para mejor lectura */
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px dotted #374151;
+        }
+        .log-info { color: #60a5fa; } 
+        .log-warning { color: #facc15; } 
+        .log-error { color: #f87171; font-weight: bold; } 
+        .log-success { color: #34d399; } 
+        .log-risk { color: #fb7185; font-weight: bold; } 
+        .log-winner { color: #a78bfa; font-size: 1.1em; font-weight: bold; } 
+        
+        /* Modal */
+        .modal-transition { transition: opacity 0.3s, transform 0.3s; }
+        .hidden-modal { opacity: 0; pointer-events: none; transform: scale(0.95); }
+        .visible-modal { opacity: 1; pointer-events: auto; transform: scale(1); }
+
+        /* Ruleta de Ocurrencia */
+        .roulette-box {
+            height: 120px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            animation: pulse-border 1.5s infinite;
+        }
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+        }
+
+        /* Estilo para la leyenda (Ahora en lista vertical) */
+        .legend-icon-box {
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body class="p-4">
+    <!-- Contenedor Principal del Juego -->
+    <div class="game-container bg-gray-800 p-6 rounded-xl mt-6 lg:mt-12">
+        
+        <!-- COLUMNA PRINCIPAL (Tablero, Leyenda y Log) -->
+        <div class="lg:order-1 order-2">
+            <h1 class="text-3xl font-extrabold text-white mb-4 border-b border-gray-700 pb-2">RISKOPOLY 🎲</h1>
+            <p class="text-sm text-indigo-300 mb-6">Simulador Multiequipo de Gestión de Proyectos</p>
+
+            <!-- Panel de Turno Actual -->
+            <div class="bg-indigo-900/50 p-4 rounded-lg mb-6 shadow-xl">
+                <p class="text-xs font-semibold text-indigo-300">TURNO ACTUAL:</p>
+                <p id="currentTurnInfo" class="text-2xl font-bold text-white">Cargando...</p>
+                <p id="currentTileInfo" class="text-sm text-indigo-400 mt-1"></p>
+            </div>
+
+            <!-- Leyenda de Casillas (Ahora como lista vertical) -->
+            <h2 class="text-xl font-semibold text-white mb-3">Índice de Casillas (Leyenda)</h2>
+            <div id="tileLegend" class="flex flex-col space-y-3 bg-gray-700 p-4 rounded-lg mb-6">
+                <!-- La leyenda se genera aquí por JS -->
+            </div>
+
+            <!-- Visualización del Tablero -->
+            <h2 id="boardTitle" class="text-xl font-semibold text-white mb-3"></h2>
+            <div id="boardPath" class="board-path">
+                <!-- Tiles se generan aquí por JS -->
+            </div>
+
+            <!-- Log de Eventos -->
+            <h2 class="text-xl font-semibold text-white mt-6 mb-3 border-t border-gray-700 pt-3">Registro de Eventos</h2>
+            <div id="eventLog" class="bg-gray-700 p-4 rounded-lg h-48 overflow-y-auto text-sm text-gray-200">
+                <!-- Log entries se añaden aquí -->
+                <p class="log-info">Esperando a que el juego inicie...</p>
+            </div>
+        </div>
+
+        <!-- COLUMNA LATERAL (Controles y Scoreboard) -->
+        <div class="lg:order-2 order-1 bg-gray-700 p-6 rounded-xl shadow-2xl sticky top-4">
+            
+            <!-- Botón de Inicio/Dado -->
+            <div id="actionPanel" class="text-center mb-6">
+                <button id="mainActionButton" onclick="handleMainAction()" class="w-full bg-red-600 hover:bg-red-700 text-white font-extrabold py-4 rounded-xl shadow-lg transition ease-in-out text-lg btn-restart">
+                    Conectar e Iniciar Juego
+                </button>
+            </div>
+
+            <!-- Sección de Decisiones (Oculta al inicio) -->
+            <div id="decisionSection" class="mb-6 hidden">
+                <p id="decisionTitle" class="text-lg font-bold text-yellow-300 mb-3 border-b border-yellow-800 pb-1">Toma tu Decisión:</p>
+                <p id="riskDetails" class="text-sm text-gray-200 mb-3"></p>
+                <div class="grid grid-cols-2 gap-3">
+                    <!-- Botones de decisión para Riesgo Crítico (R) -->
+                    <button id="btnMitigar" onclick="handleDecision('Mitigar')" class="btn-decision bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-2 rounded-lg text-sm transition-transform hover:scale-105">Mitigar (+200€, +1T)</button>
+                    <button id="btnTransferir" onclick="handleDecision('Transferir')" class="btn-decision bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-2 rounded-lg text-sm transition-transform hover:scale-105">Transferir (+100€, Máx I=1)</button>
+                    <button id="btnAsumir" onclick="handleDecision('Asumir')" class="btn-decision bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-2 rounded-lg text-sm transition-transform hover:scale-105">Asumir (0€, I Completo)</button>
+                    <button id="btnIgnorar" onclick="handleDecision('Ignorar')" class="btn-decision bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-2 rounded-lg text-sm transition-transform hover:scale-105">Ignorar (0€, +2I, +2T)</button>
+                </div>
+                <!-- Botón de decisión para Oportunidad (O) -->
+                <button id="btnAceptarOportunidad" onclick="handleDecision('Aceptar Oportunidad')" class="btn-decision bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-2 rounded-lg text-sm transition-transform hover:scale-105 mt-4 hidden">Aceptar Oportunidad</button>
+                <button id="btnRechazarOportunidad" onclick="handleDecision('Rechazar Oportunidad')" class="btn-decision bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-2 rounded-lg text-sm transition-transform hover:scale-105 mt-4 hidden">Rechazar (Seguir)</button>
+            </div>
+
+            <!-- Scoreboard -->
+            <h2 class="text-xl font-semibold text-white mt-6 mb-3 border-t border-gray-600 pt-3">Scoreboard y Puntuación</h2>
+            <div id="scoreboard" class="space-y-3">
+                <!-- Teams status here -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Notificaciones General -->
+    <div id="notificationModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 modal-transition hidden-modal">
+        <div class="bg-gray-900 p-8 rounded-xl shadow-2xl text-center w-full max-w-md modal-transition">
+            <p id="modalTitle" class="text-2xl font-bold text-indigo-400 mb-4">Notificación</p>
+            
+            <!-- Contenido Dinámico -->
+            <div id="modalContent">
+                <!-- Icono del Dado o Acción -->
+                <i id="modalIcon" class="fas text-7xl text-white mb-4"></i>
+                <p id="modalText" class="text-xl text-gray-200">...</p>
+                
+                <!-- Ruleta de Ocurrencia (Se muestra solo para el resultado del riesgo) -->
+                <div id="rouletteResult" class="hidden">
+                    <p class="text-md text-gray-400 mt-4">Chequeando Ocurrencia...</p>
+                    <div id="rouletteVisual" class="roulette-box bg-gray-800 text-white border-2 border-dashed border-white/50">
+                        <i class="fas fa-spinner fa-spin text-4xl text-yellow-500"></i>
+                    </div>
+                    <p id="rouletteOutcomeText" class="text-3xl font-extrabold mt-3 hidden"></p>
+                </div>
+            </div>
+            
+            <button id="modalCloseButton" onclick="hideNotificationModal()" class="mt-6 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition hidden">
+                Continuar
+            </button>
+        </div>
+    </div>
+
+    <!-- SCRIPT PRINCIPAL DEL JUEGO (type="module" para Firebase) -->
+    <script type="module">
+        // --- FIREBASE IMPORTS ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // --- CONSTANTES Y DATOS DEL JUEGO ---
+        const NUM_TEAMS = 4;
+        const BOARD_SIZE = 25; // Tamaño reducido para tablero dinámico
+        const BASE_COST = 50; 
+        const BASE_TIME = 1; 
+        const IMPACT_COST_MULTIPLIER = 50; 
+        
+        const DICE_ICONS = ['fa-dice-one', 'fa-dice-two', 'fa-dice-three', 'fa-dice-four', 'fa-dice-five', 'fa-dice-six'];
+        const TEAM_COLORS = ['bg-red-500', 'bg-green-500', 'bg-blue-500', 'bg-yellow-500'];
+
+        // Mapeo de Casillas (Solo eventos)
+        const TILE_MAP = {
+            'S': { label: 'Inicio', color: 'bg-green-600', effect: 'Meta: Inicio de Proyecto', icon: 'fa-flag-checkered', type: 'Start' },
+            'C': { label: 'Cierre', color: 'bg-yellow-500', effect: 'Meta: Proyecto Finalizado', icon: 'fa-trophy', type: 'End' },
+            // Casillas de Riesgo/Penalización (Rojo/Oscuro)
+            'R': { label: 'Riesgo Crítico', color: 'bg-red-800', effect: 'Riesgo de Alto Impacto. Requiere DECISIÓN ESTRATÉGICA.', icon: 'fa-triangle-exclamation', type: 'RiskDecision' },
+            'X': { label: 'Azar Total', color: 'bg-red-900', effect: 'Evento de Azar con consecuencia inmediata (penalización o bono).', icon: 'fa-shuffle', type: 'Chance' },
+            // Casillas de Bonificación/Oportunidad (Verde/Azul/Amarillo)
+            'O': { label: 'Oportunidad', color: 'bg-blue-600', effect: 'Oportunidad de mejora. Requiere DECISIÓN DE INVERSIÓN.', icon: 'fa-sack-dollar', type: 'OpportunityDecision' },
+            'B': { label: 'Bonus', color: 'bg-amber-400', effect: 'Bono: Reducción de Impacto o Costo (Beneficio directo).', icon: 'fa-star', type: 'BonusDirect' }
+        };
+        
+        // El tablero se compone solo de casillas de evento y los extremos
+        const eventTiles = ['R', 'R', 'O', 'B', 'X', 'R', 'R', 'O', 'B', 'R', 'X', 'R', 'O', 'R', 'B', 'R', 'X', 'O', 'R', 'B', 'R', 'O', 'X']; 
+        const boardTiles = ['S', ...eventTiles, 'C']; // Total 25 tiles.
+
+        const DECISION_LOGIC = {
+            // Lógica para Riesgo Crítico (R)
+            'Mitigar':    { cost: 200, time: 1, maxImpact: 0, penaltyImpact: 0, log: "Mitigación (Inversión)" },
+            'Transferir': { cost: 100, time: 0, maxImpact: 1, penaltyImpact: 0, log: "Transferencia (Prima/Contrato)" },
+            'Asumir':     { cost: 0,   time: 0, maxImpact: Infinity, penaltyImpact: 0, log: "Asumir (Riesgo total)" },
+            'Ignorar':    { cost: 0,   time: 2, maxImpact: Infinity, penaltyImpact: 2, log: "Ignorar (Caos y Reproceso)" },
+            // Lógica para Oportunidad (O)
+            'Aceptar Oportunidad': { cost: -150, time: -1, chanceCost: 100, log: "Inversión en Oportunidad" },
+            'Rechazar Oportunidad': { cost: 0, time: 0, log: "Oportunidad Rechazada" }
+        };
+
+        const HIDDEN_RISKS = [
+            { name: "Saturación del sistema de control", impact: 2, prob: 0.70 },
+            { name: "Error humano inesperado", impact: 1, prob: 0.60 },
+            { name: "Problemas de logística externa", impact: 1, prob: 0.50 },
+            { name: "Auditoría sorpresiva", impact: 3, prob: 0.75 },
+            { name: "Reproceso masivo", impact: 3, prob: 0.80 },
+            { name: "Caída de servidor/ERP", impact: 2, prob: 0.65 },
+        ];
+        
+        const OPPORTUNITY_OPTIONS = [
+             { name: "Automatización de Tareas", bonus: { cost: -250, time: -2 }, cost: 150, prob: 0.80, fail: { cost: -50, time: 0 } },
+             { name: "Descuento por Volumen", bonus: { cost: -100, time: 0 }, cost: 50, prob: 0.95, fail: { cost: 0, time: 0 } },
+             { name: "Integración de Nuevas Herramientas", bonus: { cost: 0, time: -3, impact: -1 }, cost: 200, prob: 0.60, fail: { cost: 50, time: 1 } },
+        ];
+
+        const BONUS_EFFECTS = [
+            { impact: -1, cost: 0, log: "Bono: Reducción de Impacto futuro (Eficiencia técnica)." },
+            { impact: 0, cost: -150, log: "Bono: Reducción de Costo inesperada (Error en factura a favor)." },
+        ];
+
+        const CHANCE_EFFECTS = [
+            { cost: 200, time: 1, log: "Penalización: Costo doble y retraso por auditoría interna." },
+            { cost: 0, time: 2, log: "Penalización: Retraso de 2 turnos por reproceso inesperado." },
+            { cost: -150, time: -1, log: "Bonificación: Descuento inesperado del proveedor." },
+            { cost: 50, time: 0, impact: 1, log: "Penalización: Requerimiento no documentado. Pequeño impacto y costo." },
+        ];
+        
+        // --- FIREBASE AND GAME STATE ---
+        let db, auth;
+        let userId;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const gameRefPath = `artifacts/${appId}/public/data/riskopolyGames/game_state`;
+
+        let gameState = {
+            isGameRunning: false,
+            currentTeamIndex: 0,
+            teams: [],
+            log: ['[info] Esperando inicialización...'],
+            activeRisk: null, // Para Riesgo Crítico (R)
+            activeOpportunity: null // Para Oportunidad (O)
+        };
+        
+        // --- DOM REFERENCES ---
+        const mainActionButton = document.getElementById('mainActionButton');
+        const eventLogEl = document.getElementById('eventLog');
+        const boardPathEl = document.getElementById('boardPath');
+        const scoreboardEl = document.getElementById('scoreboard');
+        const currentTurnInfoEl = document.getElementById('currentTurnInfo');
+        const currentTileInfoEl = document.getElementById('currentTileInfo');
+        const boardTitleEl = document.getElementById('boardTitle');
+        
+        // Decision Panel Elements
+        const decisionSectionEl = document.getElementById('decisionSection');
+        const decisionTitleEl = document.getElementById('decisionTitle');
+        const riskDetailsEl = document.getElementById('riskDetails');
+        const btnMitigar = document.getElementById('btnMitigar');
+        const btnTransferir = document.getElementById('btnTransferir');
+        const btnAsumir = document.getElementById('btnAsumir');
+        const btnIgnorar = document.getElementById('btnIgnorar');
+        const btnAceptarOportunidad = document.getElementById('btnAceptarOportunidad');
+        const btnRechazarOportunidad = document.getElementById('btnRechazarOportunidad');
+        
+        const tileLegendEl = document.getElementById('tileLegend'); 
+
+        // Modal elements
+        const notificationModal = document.getElementById('notificationModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalIcon = document.getElementById('modalIcon');
+        const modalText = document.getElementById('modalText');
+        const modalCloseButton = document.getElementById('modalCloseButton');
+        const rouletteResultEl = document.getElementById('rouletteResult');
+        const rouletteVisualEl = document.getElementById('rouletteVisual');
+        const rouletteOutcomeTextEl = document.getElementById('rouletteOutcomeText');
+
+        // --- UTILITIES ---
+
+        /**
+         * Añade un evento al log del estado del juego en un formato que incluye el tipo.
+         */
+        async function logEvent(message, type = 'info') {
+            if (!gameState.log) {
+                gameState.log = [];
+            }
+            // Asegurar que solo guardamos las últimas 100 entradas
+            if (gameState.log.length >= 100) {
+                gameState.log.shift(); 
+            }
+            gameState.log.push(`[${type}] ${message}`);
+        }
+
+        /**
+         * Muestra el modal de notificación con contenido dinámico.
+         */
+        function showNotificationModal(title, text, iconClass = null, showClose = true, showRoulette = false) {
+            modalTitle.textContent = title;
+            modalText.innerHTML = text;
+            
+            if (iconClass) {
+                modalIcon.className = `fas ${iconClass} text-7xl text-white mb-4`;
+                modalIcon.classList.remove('hidden');
+            } else {
+                modalIcon.classList.add('hidden');
+            }
+
+            modalCloseButton.classList.toggle('hidden', !showClose);
+
+            if (showRoulette) {
+                rouletteResultEl.classList.remove('hidden');
+            } else {
+                rouletteResultEl.classList.add('hidden');
+                // Asegurar que la ruleta esté en estado inicial
+                rouletteVisualEl.innerHTML = '<i class="fas fa-spinner fa-spin text-4xl text-yellow-500"></i>';
+                rouletteVisualEl.className = 'roulette-box bg-gray-800 text-white border-2 border-dashed border-white/50';
+                rouletteOutcomeTextEl.classList.add('hidden');
+            }
+
+            notificationModal.classList.remove('hidden-modal');
+            notificationModal.classList.add('visible-modal');
+        }
+
+        window.hideNotificationModal = function() {
+            notificationModal.classList.remove('visible-modal');
+            notificationModal.classList.add('hidden-modal');
+        }
+
+
+        // --- FIREBASE INITIALIZATION AND SYNC ---
+        
+        async function initializeFirebase() {
+            try {
+                setLogLevel('Debug');
+                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                userId = auth.currentUser.uid;
+                await logEvent(`Conexión exitosa. Tu ID: ${userId.substring(0, 8)}...`, 'info');
+                
+                await setupGameStateListener();
+            } catch (error) {
+                console.error("Error al inicializar Firebase:", error);
+                await logEvent(`Error crítico de conexión: ${error.message}`, 'error');
+                renderLog(); 
+            }
+        }
+        
+        async function setupGameStateListener() {
+            const gameRef = doc(db, gameRefPath);
+
+            const docSnap = await getDoc(gameRef);
+            if (!docSnap.exists()) {
+                await initializeNewGame();
+            }
+
+            onSnapshot(gameRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    // Solo actualizar si el estado ha cambiado para evitar bucles de renderizado
+                    if (JSON.stringify(gameState) !== JSON.stringify(data)) {
+                        gameState = data;
+                        renderGame();
+                    }
+                } else {
+                    logEvent("El estado del juego fue borrado o no existe. Reiniciando...", 'warning');
+                    initializeNewGame();
+                }
+            }, (error) => {
+                console.error("Error al escuchar el estado del juego:", error);
+                logEvent(`Error de sincronización con Firestore: ${error.message}`, 'error');
+            });
+        }
+        
+        async function initializeNewGame() {
+            const newTeams = [];
+            for (let i = 0; i < NUM_TEAMS; i++) {
+                newTeams.push({
+                    id: `team-${i}`,
+                    name: `Equipo ${i + 1}`,
+                    position: 0, 
+                    time: 0, 
+                    cost: 0, 
+                    impact: 0, 
+                    isFinished: false,
+                    finalScore: 0,
+                    scoreRating: ''
+                });
+            }
+
+            const initialGameState = {
+                isGameRunning: false,
+                currentTeamIndex: 0,
+                teams: newTeams,
+                log: [`[info] Juego iniciado. ¡Comiencen a competir!`],
+                activeRisk: null,
+                activeOpportunity: null
+            };
+
+            const gameRef = doc(db, gameRefPath);
+            await setDoc(gameRef, initialGameState);
+            gameState = initialGameState;
+            renderGame();
+        }
+
+        async function updateGameState() {
+            if (!db) return; 
+            const gameRef = doc(db, gameRefPath);
+            try {
+                // Solo guardar propiedades esenciales y primitivas para la sincronización
+                const simpleState = {
+                    isGameRunning: gameState.isGameRunning,
+                    currentTeamIndex: gameState.currentTeamIndex,
+                    teams: gameState.teams,
+                    log: gameState.log,
+                    activeRisk: gameState.activeRisk,
+                    activeOpportunity: gameState.activeOpportunity
+                };
+                await setDoc(gameRef, simpleState, { merge: true });
+            } catch (error) {
+                console.error("Error al guardar el estado del juego:", error);
+                await logEvent(`Error al guardar el estado: ${error.message}`, 'error');
+            }
+        }
+
+        // --- RENDERIZADO DEL JUEGO ---
+
+        function renderGame() {
+            renderLegend(); 
+            renderBoard();
+            renderScoreboard();
+            renderControls();
+            renderLog();
+        }
+        
+        function renderLegend() {
+            tileLegendEl.innerHTML = '';
+            
+            // Usar un Set para obtener solo los tipos únicos de TILE_MAP
+            const uniqueTileKeys = [...new Set(boardTiles)].filter(key => key !== 'C' && key !== 'S'); // Excluir Cierre e Inicio
+
+            // Añadir manualmente Inicio y Cierre al principio
+            const keysToRender = ['S', ...uniqueTileKeys, 'C'];
+
+            keysToRender.forEach(key => {
+                const tileData = TILE_MAP[key];
+
+                const legendItem = document.createElement('div');
+                legendItem.className = 'flex items-center space-x-3 p-3 rounded-lg bg-gray-800 shadow-md';
+                
+                const iconBox = document.createElement('div');
+                iconBox.className = `legend-icon-box ${tileData.color} text-white flex-shrink-0`;
+                iconBox.innerHTML = `<i class="fas ${tileData.icon}"></i>`;
+                
+                const textContent = document.createElement('div');
+                textContent.className = 'flex flex-col';
+                textContent.innerHTML = `
+                    <p class="text-sm font-bold text-white">${tileData.label} (${key})</p>
+                    <p class="text-xs text-gray-400">${tileData.effect}</p>
+                `;
+
+                legendItem.appendChild(iconBox);
+                legendItem.appendChild(textContent);
+                tileLegendEl.appendChild(legendItem);
+            });
+        }
+
+
+        function renderBoard() {
+            boardPathEl.innerHTML = '';
+            boardTitleEl.textContent = `Tablero de Eventos (Casillas 1-${BOARD_SIZE})`;
+
+            gameState.teams.forEach(team => {
+                // Asegurar que la posición no exceda el tamaño del tablero
+                if (team.position > BOARD_SIZE) team.position = BOARD_SIZE;
+            });
+            
+            boardTiles.forEach((tileCode, index) => {
+                const tileIndex = index + 1;
+                const tileData = TILE_MAP[tileCode];
+
+                let tileClass = `board-tile ${tileData.color} shadow-xl`;
+                
+                const tileEl = document.createElement('div');
+                tileEl.className = tileClass;
+                tileEl.setAttribute('data-index', tileIndex);
+                tileEl.title = `${tileData.label} (${tileIndex}): ${tileData.effect}`;
+                
+                // Mostrar solo el ícono y el número de casilla
+                let content = `<i class="fas ${tileData.icon}"></i><span class="text-xs">${tileIndex}</span>`;
+                tileEl.innerHTML = content;
+
+                // Añadir marcadores de equipo
+                gameState.teams.forEach((team, teamIndex) => {
+                    if (team.position === tileIndex) {
+                        const marker = document.createElement('div');
+                        marker.className = `team-marker marker-team-${teamIndex}`;
+                        tileEl.appendChild(marker);
+                    }
+                });
+
+                boardPathEl.appendChild(tileEl);
+            });
+
+            const currentTeam = gameState.teams[gameState.currentTeamIndex];
+            currentTurnInfoEl.textContent = gameState.isGameRunning ? currentTeam.name : 'Esperando Inicio';
+            currentTileInfoEl.textContent = `Usuario: ${userId ? userId.substring(0, 8) : 'Anónimo'}`;
+        }
+
+        function renderScoreboard() {
+            scoreboardEl.innerHTML = '';
+            gameState.teams.forEach((team, index) => {
+                const teamColor = TEAM_COLORS[index];
+                const teamActive = gameState.isGameRunning && index === gameState.currentTeamIndex && !team.isFinished ? 'ring-2 ring-indigo-400' : '';
+                
+                const scoreCard = `
+                    <div class="p-4 rounded-lg bg-gray-800 border-l-4 ${teamColor.replace('bg-', 'border-')} ${teamActive}">
+                        <div class="flex justify-between items-center mb-2">
+                            <p class="font-bold text-white">${team.name}</p>
+                            ${team.isFinished ? `<span class="text-xs text-green-400 font-bold">¡FINALIZADO!</span>` : `<span class="text-xs text-indigo-400">Posición: ${team.position}/${BOARD_SIZE}</span>`}
+                        </div>
+                        <div class="grid grid-cols-3 text-sm text-gray-300">
+                            <div><p class="font-semibold text-xs">Tiempo (Turnos):</p><p class="text-white font-bold">${team.time}</p></div>
+                            <div><p class="font-semibold text-xs">Costo (€):</p><p class="text-white font-bold">${team.cost}</p></div>
+                            <div><p class="font-semibold text-xs">Impacto (Pts):</p><p class="text-white font-bold">${team.impact}</p></div>
+                        </div>
+                        ${team.isFinished ? `<p class="mt-2 text-md font-extrabold text-yellow-400">Puntaje Final: ${team.finalScore.toFixed(2)} (${team.scoreRating})</p>` : ''}
+                    </div>
+                `;
+                scoreboardEl.innerHTML += scoreCard;
+            });
+        }
+        
+        function renderControls() {
+            const currentTeam = gameState.teams[gameState.currentTeamIndex];
+
+            // Ocultar todos los botones de decisión por defecto
+            [btnMitigar, btnTransferir, btnAsumir, btnIgnorar, btnAceptarOportunidad, btnRechazarOportunidad].forEach(btn => btn.classList.add('hidden'));
+
+            if (gameState.teams.every(t => t.isFinished)) {
+                 mainActionButton.textContent = 'Calcular Puntuación Final';
+                 mainActionButton.classList.remove('bg-red-600', 'animate-pulse', 'hidden', 'bg-blue-600');
+                 mainActionButton.classList.add('bg-purple-600');
+                 decisionSectionEl.classList.add('hidden');
+                 return;
+            } 
+            
+            if (!gameState.isGameRunning) {
+                mainActionButton.textContent = 'Iniciar Juego (o Reiniciar)';
+                mainActionButton.classList.remove('bg-blue-600', 'animate-pulse', 'hidden', 'bg-purple-600');
+                mainActionButton.classList.add('bg-red-600');
+                decisionSectionEl.classList.add('hidden');
+                return;
+            } 
+
+            if (currentTeam.isFinished) {
+                // Si el equipo actual ha terminado, pasar al siguiente sin mostrar el botón de acción
+                setTimeout(nextTurn, 500); 
+                mainActionButton.classList.add('hidden');
+                decisionSectionEl.classList.add('hidden');
+                return;
+            }
+
+            if (gameState.activeRisk) {
+                // Decisión de Riesgo Crítico (R)
+                const risk = gameState.activeRisk;
+                decisionTitleEl.textContent = `RIESGO CRÍTICO ACTIVADO: ${risk.name}`;
+                riskDetailsEl.innerHTML = `
+                    <p>Impacto Base: <span class="text-red-400 font-bold">${risk.impact} Pts</span></p>
+                    <p>Costo Estimado: <span class="text-red-400 font-bold">${risk.impact * IMPACT_COST_MULTIPLIER}€</span></p>
+                    <p>Prob. Ocurrencia: <span class="text-yellow-400 font-bold">${(risk.prob * 100).toFixed(0)}%</span></p>
+                    <p class="mt-2 text-sm font-semibold text-indigo-300">Selecciona una estrategia de respuesta:</p>
+                `;
+                decisionSectionEl.classList.remove('hidden');
+                mainActionButton.classList.add('hidden');
+                
+                // Mostrar botones de Mitigación/Transferir/Asumir/Ignorar
+                [btnMitigar, btnTransferir, btnAsumir, btnIgnorar].forEach(btn => btn.classList.remove('hidden'));
+                return;
+            }
+
+            if (gameState.activeOpportunity) {
+                // Decisión de Oportunidad (O)
+                const opp = gameState.activeOpportunity;
+                decisionTitleEl.textContent = `OPORTUNIDAD ENCONTRADA: ${opp.name}`;
+                riskDetailsEl.innerHTML = `
+                    <p class="text-lg font-bold text-green-400">Beneficio Estimado: ${opp.bonus.cost ? opp.bonus.cost + '€, ' : ''} ${opp.bonus.time ? opp.bonus.time + 'T' : ''} </p>
+                    <p>Costo de Inversión: <span class="text-red-400 font-bold">${opp.cost}€</span></p>
+                    <p>Prob. Éxito: <span class="text-yellow-400 font-bold">${(opp.prob * 100).toFixed(0)}%</span></p>
+                    <p class="mt-2 text-sm font-semibold text-indigo-300">¿Invertir para perseguir esta oportunidad?</p>
+                `;
+                decisionSectionEl.classList.remove('hidden');
+                mainActionButton.classList.add('hidden');
+
+                // Mostrar botones de Aceptar/Rechazar Oportunidad
+                btnAceptarOportunidad.textContent = `Aceptar (Costo: ${opp.cost}€)`;
+                [btnAceptarOportunidad, btnRechazarOportunidad].forEach(btn => btn.classList.remove('hidden'));
+                return;
+            }
+
+
+            // Si no hay decisiones pendientes, mostrar el botón de tirar dado
+            mainActionButton.textContent = 'Tirar Dado (Mover)';
+            mainActionButton.classList.remove('bg-red-600', 'hidden', 'bg-purple-600');
+            mainActionButton.classList.add('bg-blue-600', 'animate-pulse');
+            decisionSectionEl.classList.add('hidden');
+            mainActionButton.disabled = false;
+        }
+        
+        function renderLog() {
+            eventLogEl.innerHTML = '';
+            // Mostrar los más recientes primero
+            [...gameState.log].reverse().forEach(entry => {
+                const match = entry.match(/^\[(info|warning|error|success|risk|winner)\]\s*(.*)$/);
+                const type = match ? match[1] : 'log';
+                const message = match ? match[2] : entry;
+
+                const logDiv = document.createElement('div');
+                logDiv.className = `log-entry log-${type}`;
+                logDiv.innerHTML = `<span>${message}</span>`;
+                eventLogEl.appendChild(logDiv);
+            });
+            eventLogEl.scrollTop = 0; 
+        }
+
+        // --- LÓGICA DEL JUEGO ---
+
+        window.handleMainAction = async function() {
+            if (!gameState.isGameRunning) {
+                await startStopGame(true);
+            } else if (gameState.teams.every(t => t.isFinished)) {
+                await calculateFinalScores();
+            } else {
+                rollDice();
+            }
+        }
+
+        async function startStopGame(start) {
+            const teams = gameState.teams.map(t => ({
+                ...t, 
+                position: 0, time: 0, cost: 0, impact: 0, isFinished: false, finalScore: 0
+            }));
+
+            const initialGameState = {
+                isGameRunning: start, 
+                currentTeamIndex: 0, 
+                teams: teams, 
+                log: start ? [`[info] Juego iniciado. ¡El ${teams[0].name} tira el dado!]`] : ["Juego detenido y reiniciado."],
+                activeRisk: null,
+                activeOpportunity: null
+            };
+
+            gameState = initialGameState;
+            await updateGameState();
+        }
+
+        async function rollDice() {
+            if (!gameState.isGameRunning || gameState.activeRisk || gameState.activeOpportunity) return;
+            mainActionButton.disabled = true;
+
+            const currentTeam = gameState.teams[gameState.currentTeamIndex];
+            
+            const roll = Math.floor(Math.random() * 6) + 1;
+            
+            showNotificationModal(
+                'Resultado del Dado',
+                `<p class="text-indigo-400 text-lg mb-4">${currentTeam.name} tiró...</p>
+                 <p class="text-5xl font-extrabold text-yellow-400 mt-4">${roll}</p>`,
+                DICE_ICONS[roll - 1],
+                false, 
+                false
+            );
+
+            setTimeout(async () => {
+                hideNotificationModal();
+
+                const oldPosition = currentTeam.position;
+                let newPosition = Math.min(BOARD_SIZE, oldPosition + roll);
+                
+                await logEvent(`${currentTeam.name} tiró un <span class="text-yellow-400 font-bold">${roll}</span>. Moviendo de ${oldPosition} a ${newPosition}.`, 'info');
+
+                currentTeam.position = newPosition;
+                currentTeam.time += BASE_TIME;
+                currentTeam.cost += BASE_COST;
+
+                let needsDecision = false;
+                
+                if (newPosition === BOARD_SIZE) {
+                    currentTeam.isFinished = true;
+                    await logEvent(`¡${currentTeam.name} ha llegado a la meta! ¡PROYECTO FINALIZADO!`, 'success');
+                    needsDecision = false; 
+                } else if (newPosition > 0) {
+                    const tileCode = boardTiles[newPosition - 1];
+                    const actionResult = await executeTileAction(currentTeam, tileCode);
+
+                    if (actionResult.requiresDecision) {
+                        needsDecision = true;
+                    }
+                }
+
+                await updateGameState();
+                
+                if (!needsDecision) {
+                    setTimeout(nextTurn, 1000); 
+                }
+
+            }, 2500); 
+        }
+
+        async function executeTileAction(team, tileCode) {
+            const tileData = TILE_MAP[tileCode];
+            let requiresDecision = false;
+            let logMsg = '';
+            let icon = tileData.icon;
+            let title = 'Acción de Casilla';
+            let tileType = tileData.type;
+
+            if (tileType === 'RiskDecision') {
+                const riskToResolve = HIDDEN_RISKS[Math.floor(Math.random() * HIDDEN_RISKS.length)];
+                gameState.activeRisk = riskToResolve;
+                logMsg = `${team.name} cayó en Riesgo Crítico. Riesgo: <span class="text-red-300">${riskToResolve.name} (Impacto Base: ${riskToResolve.impact})</span>.`;
+                requiresDecision = true;
+            } else if (tileType === 'OpportunityDecision') {
+                 const opportunity = OPPORTUNITY_OPTIONS[Math.floor(Math.random() * OPPORTUNITY_OPTIONS.length)];
+                 gameState.activeOpportunity = opportunity;
+                 logMsg = `${team.name} encontró una Oportunidad: <span class="text-blue-300">${opportunity.name}</span>. Requiere inversión.`;
+                 requiresDecision = true;
+
+            } else if (tileType === 'Chance') {
+                 // Evento de Azar: se resuelve inmediatamente y no requiere decisión
+                const chance = CHANCE_EFFECTS[Math.floor(Math.random() * CHANCE_EFFECTS.length)];
+                team.cost += (chance.cost || 0);
+                team.time += (chance.time || 0);
+                team.impact += (chance.impact || 0);
+
+                const outcomeType = chance.cost < 0 ? 'Bonificación' : 'Penalización';
+                logMsg = `[Azar Total] ${team.name} obtuvo un resultado de Azar Total. ${outcomeType}: ${chance.log}`;
+                
+                const modalIconClass = chance.cost < 0 ? 'fa-face-smile-wink' : 'fa-face-frown';
+                const modalColor = chance.cost < 0 ? 'text-green-400' : 'text-red-400';
+
+                showNotificationModal(title, `<p class="text-lg ${modalColor} font-bold">${outcomeType}</p><p class="text-base mt-2">${chance.log}</p>`, modalIconClass);
+            
+            } else if (tileType === 'BonusDirect') {
+                const bonus = BONUS_EFFECTS[Math.floor(Math.random() * BONUS_EFFECTS.length)];
+                team.impact += (bonus.impact || 0);
+                team.cost += (bonus.cost || 0);
+                logMsg = `[Bonificación] ${team.name} obtuvo un Bonus. ${bonus.log}`;
+                showNotificationModal(title, `<p class="text-lg text-amber-400 font-bold">Bono de Eficiencia</p><p class="text-base mt-2">${bonus.log}</p>`, icon);
+            }
+
+            if (logMsg) {
+                const logType = tileType === 'RiskDecision' ? 'risk' : (tileType.includes('Decision') ? 'warning' : 'success');
+                await logEvent(logMsg, logType);
+            }
+            return { requiresDecision };
+        }
+        
+        window.handleDecision = async function(decision) {
+            document.querySelectorAll('.btn-decision').forEach(btn => btn.disabled = true);
+            
+            const currentTeam = gameState.teams[gameState.currentTeamIndex];
+            
+            if (gameState.activeRisk) {
+                await resolveRiskDecision(decision, currentTeam);
+            } else if (gameState.activeOpportunity) {
+                await resolveOpportunityDecision(decision, currentTeam);
+            } else {
+                 await logEvent("Error: No hay decisión activa para resolver.", 'error');
+                 nextTurn();
+            }
+        }
+
+        async function resolveOpportunityDecision(decision, currentTeam) {
+            const oppToResolve = gameState.activeOpportunity;
+            const logType = decision === 'Aceptar Oportunidad' ? 'success' : 'warning';
+            let eventLogMsg = `[Decisión Oportunidad] ${currentTeam.name} eligió: <span class="font-bold">${decision}</span>. `;
+
+            if (decision === 'Rechazar Oportunidad') {
+                eventLogMsg += `Oportunidad '${oppToResolve.name}' rechazada. Sin costes ni beneficios.`;
+                showNotificationModal('Oportunidad Rechazada', eventLogMsg, 'fa-face-meh', true, false);
+            } else { // Aceptar Oportunidad
+                const success = Math.random() < oppToResolve.prob;
+                
+                // 1. Mostrar la ruleta
+                showNotificationModal(
+                    `${currentTeam.name} invierte en la Oportunidad`,
+                    `<p class="text-xl text-gray-200">Chequeando el éxito de la inversión...</p>`,
+                    'fa-gear',
+                    false,
+                    true
+                );
+
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                const modalIconClass = success ? 'fa-check-circle text-green-500' : 'fa-xmark-circle text-red-500';
+                rouletteVisualEl.innerHTML = `<i class="fas ${modalIconClass} text-4xl"></i>`;
+                rouletteVisualEl.className = `roulette-box border-4 ${success ? 'bg-green-900 border-green-500' : 'bg-red-900 border-red-500'}`;
+                
+                const outcomeText = success ? 
+                    `<span class="text-green-500">¡INVERSIÓN EXITOSA!</span>` : 
+                    `<span class="text-red-500">¡INVERSIÓN FALLIDA!</span>`;
+                
+                rouletteOutcomeTextEl.innerHTML = outcomeText;
+                rouletteOutcomeTextEl.classList.remove('hidden');
+
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                let finalCost = oppToResolve.cost;
+                let finalTime = 0;
+
+                if (success) {
+                    currentTeam.cost += oppToResolve.bonus.cost;
+                    currentTeam.time += oppToResolve.bonus.time;
+                    currentTeam.impact += (oppToResolve.bonus.impact || 0);
+                    finalCost += oppToResolve.bonus.cost;
+                    finalTime += oppToResolve.bonus.time;
+                    eventLogMsg += `¡Éxito! Beneficio: ${oppToResolve.bonus.cost}€, ${oppToResolve.bonus.time}T.`;
+                } else {
+                    currentTeam.cost += oppToResolve.fail.cost;
+                    currentTeam.time += oppToResolve.fail.time;
+                    finalCost += oppToResolve.fail.cost;
+                    finalTime += oppToResolve.fail.time;
+                    eventLogMsg += `Fallo. Coste de fracaso: ${oppToResolve.fail.cost}€, ${oppToResolve.fail.time}T.`;
+                }
+                
+                currentTeam.cost += oppToResolve.cost; // Cargar el costo de inversión inicial
+                eventLogMsg += ` Coste Total de Oportunidad: ${finalCost}€, Tiempo Total: +${finalTime}T.`;
+                
+                showNotificationModal(
+                    'Resultado de Inversión',
+                    `<p class="text-lg mt-2">${oppToResolve.name}</p>
+                     <p class="text-sm mt-3 text-gray-400">RESULTADO: <span class="text-yellow-300 font-bold">${success ? 'ÉXITO' : 'FRACASO'}</span></p>
+                     <p class="text-md font-bold mt-2">Coste Neto: <span class="text-red-400">${finalCost}€</span></p>
+                     <p class="text-md font-bold">Tiempo Neto: <span class="text-red-400">${finalTime} T</span></p>`,
+                    success ? 'fa-face-grin-stars' : 'fa-face-dizzy',
+                    true,
+                    false
+                );
+            }
+
+            gameState.activeOpportunity = null;
+            await logEvent(eventLogMsg, logType);
+            await updateGameState();
+            
+            modalCloseButton.onclick = () => {
+                hideNotificationModal();
+                nextTurn();
+            };
+        }
+
+        async function resolveRiskDecision(decision, currentTeam) {
+            const decisionProps = DECISION_LOGIC[decision];
+            const riskToResolve = gameState.activeRisk;
+            
+            // Probabilidad de ocurrencia específica del riesgo (del objeto riskToResolve)
+            const riskOccurs = Math.random() < riskToResolve.prob; 
+            
+            // 1. Mostrar la ruleta
+            showNotificationModal(
+                `${currentTeam.name} eligió ${decision}`,
+                `<p class="text-xl text-gray-200">Chequeando si el riesgo se materializa...</p>`,
+                'fa-shield-halved',
+                false,
+                true
+            );
+
+            // 2. Simulación de la "Ruleta"
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            const modalIconClass = riskOccurs ? 'fa-exclamation-circle text-red-500' : 'fa-check-circle text-green-500';
+            rouletteVisualEl.innerHTML = `<i class="fas ${modalIconClass} text-4xl"></i>`;
+            rouletteVisualEl.className = `roulette-box border-4 ${riskOccurs ? 'bg-red-900 border-red-500' : 'bg-green-900 border-green-500'}`;
+
+            const outcomeText = riskOccurs ? 
+                `<span class="text-red-500">¡RIESGO MATERIALIZADO!</span>` : 
+                `<span class="text-green-500">¡RIESGO EVITADO!</span>`;
+            
+            rouletteOutcomeTextEl.innerHTML = outcomeText;
+            rouletteOutcomeTextEl.classList.remove('hidden');
+
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // 3. Aplicar y mostrar el resultado final
+            currentTeam.cost += decisionProps.cost;
+            currentTeam.time += decisionProps.time;
+
+            let eventLogMsg = `[Decisión Riesgo] ${currentTeam.name} eligió: <span class="font-bold">${decision}</span>. ${decisionProps.log}. `;
+            let finalImpact = 0;
+            let finalCost = decisionProps.cost;
+            let finalTime = decisionProps.time;
+
+            if (riskOccurs) {
+                const baseEventImpact = riskToResolve.impact;
+
+                if (decision === 'Mitigar') {
+                    finalImpact = decisionProps.maxImpact; // 0
+                    eventLogMsg += `¡Mitigación exitosa! Riesgo '${riskToResolve.name}' contenido (Impacto: 0).`;
+                } else if (decision === 'Transferir') {
+                    finalImpact = Math.min(baseEventImpact, decisionProps.maxImpact); // Máx 1
+                    eventLogMsg += `Riesgo '${riskToResolve.name}' ocurrió. Transferido, Impacto LIMITADO a ${finalImpact}.`;
+                } else { // Asumir o Ignorar
+                    finalImpact = baseEventImpact + decisionProps.penaltyImpact;
+                    eventLogMsg += `Riesgo '${riskToResolve.name}' ocurrió. ${decision}. Impacto Total: ${finalImpact}.`;
+                }
+
+                const impactCost = finalImpact * IMPACT_COST_MULTIPLIER;
+                currentTeam.cost += impactCost;
+                finalCost += impactCost;
+                finalTime += decisionProps.time; // El tiempo de penalización por ignorar, si aplica
+            } else {
+                eventLogMsg += `El riesgo NO se activó. Buen movimiento.`;
+            }
+
+            currentTeam.impact += finalImpact;
+            gameState.activeRisk = null;
+
+            await logEvent(eventLogMsg + ` Costo de ronda: ${finalCost}€, Tiempo: +${finalTime}T.`, 'info');
+            
+            // 4. Mostrar el resumen final en el modal
+            showNotificationModal(
+                'Resultado Final de la Decisión',
+                `<p class="text-lg mt-2">${riskToResolve.name} (${finalImpact > 0 ? 'Con Impacto' : 'Sin Impacto'})</p>
+                 <p class="text-sm mt-3 text-gray-400">DECISIÓN: <span class="text-yellow-300 font-bold">${decision}</span></p>
+                 <p class="text-md font-bold mt-2">Coste Total: <span class="text-red-400">${finalCost}€</span></p>
+                 <p class="text-md font-bold">Impacto Añadido: <span class="text-red-400">${finalImpact} Pts</span></p>`,
+                riskOccurs ? 'fa-bomb' : 'fa-handshake',
+                true,
+                false
+            );
+
+            await updateGameState();
+
+            modalCloseButton.onclick = () => {
+                hideNotificationModal();
+                nextTurn();
+            };
+        }
+
+        async function nextTurn() {
+            let nextIndex = gameState.currentTeamIndex;
+            let foundNext = false;
+            
+            // Buscar el siguiente equipo que no haya terminado
+            for(let i = 1; i <= NUM_TEAMS; i++) {
+                nextIndex = (gameState.currentTeamIndex + i) % NUM_TEAMS;
+                if (!gameState.teams[nextIndex].isFinished) {
+                    foundNext = true;
+                    break;
+                }
+            }
+
+            if (foundNext) {
+                gameState.currentTeamIndex = nextIndex;
+                await logEvent(`--- Es el turno de ${gameState.teams[nextIndex].name} ---`, 'info');
+            } else {
+                if (gameState.isGameRunning && gameState.teams.every(t => t.isFinished)) {
+                     await logEvent("Todos los equipos han terminado. ¡Calculando resultados finales!", 'winner');
+                     calculateFinalScores();
+                     return;
+                }
+            }
+            
+            // Si el siguiente equipo ha terminado (y no todos han terminado), saltar al siguiente
+            if(gameState.teams[gameState.currentTeamIndex]?.isFinished) {
+                 setTimeout(nextTurn, 500); 
+            } else {
+                 await updateGameState(); 
+            }
+            
+            document.querySelectorAll('.btn-decision').forEach(btn => btn.disabled = false);
+            mainActionButton.disabled = false;
+        }
+
+        async function calculateFinalScores() {
+            let teams = gameState.teams;
+            let maxTime = Math.max(...teams.map(t => t.time));
+            let maxCost = Math.max(...teams.map(t => t.cost));
+            let maxImpact = Math.max(...teams.map(t => t.impact));
+            
+            // Asegurar que no dividimos por cero
+            maxTime = Math.max(maxTime, 1);
+            maxCost = Math.max(maxCost, 1);
+            maxImpact = Math.max(maxImpact, 1);
+
+            teams.forEach(team => {
+                // Normalización de 0 a 100, donde 100 es mejor (menos tiempo/costo/impacto)
+                const normalizedTime = (1 - (team.time / maxTime)) * 100;
+                const normalizedCost = (1 - (team.cost / maxCost)) * 100;
+                const normalizedImpact = (1 - (team.impact / maxImpact)) * 100;
+
+                // Ponderación: Costo y Tiempo pesan 40%, Impacto 20%
+                team.finalScore = 
+                    (normalizedTime * 0.40) + 
+                    (normalizedCost * 0.40) + 
+                    (normalizedImpact * 0.20);
+                
+                if (team.finalScore >= 85) team.scoreRating = 'Gestión Experta (Top)';
+                else if (team.finalScore >= 70) team.scoreRating = 'Gestión Sólida';
+                else if (team.finalScore >= 50) team.scoreRating = 'Gestión Media';
+                else team.scoreRating = 'Gestión Crítica';
+            });
+
+            teams.sort((a, b) => b.finalScore - a.finalScore);
+            const winner = teams[0];
+            
+            await logEvent(`*** EL GANADOR es ${winner.name} con un puntaje de ${winner.finalScore.toFixed(2)} (${winner.scoreRating}) ***`, 'winner');
+
+            gameState.isGameRunning = false;
+            gameState.teams = teams;
+            await updateGameState();
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = initializeFirebase;
+    </script>
+</body>
+</html>
