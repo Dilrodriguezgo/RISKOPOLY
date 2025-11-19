@@ -4,10 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RISKOPOLY - Gestión de Riesgos Multiequipo</title>
-    <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- Iconos de Font Awesome para el dado y el tablero -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         body {
@@ -129,87 +127,67 @@
     </style>
 </head>
 <body class="p-4">
-    <!-- Contenedor Principal del Juego -->
     <div class="game-container bg-gray-800 p-6 rounded-xl mt-6 lg:mt-12">
         
-        <!-- COLUMNA PRINCIPAL (Tablero, Leyenda y Log) -->
         <div class="lg:order-1 order-2">
             <h1 class="text-3xl font-extrabold text-white mb-4 border-b border-gray-700 pb-2">RISKOPOLY 🎲</h1>
             <p class="text-sm text-indigo-300 mb-6">Simulador Multiequipo de Gestión de Proyectos</p>
 
-            <!-- Panel de Turno Actual -->
             <div class="bg-indigo-900/50 p-4 rounded-lg mb-6 shadow-xl">
                 <p class="text-xs font-semibold text-indigo-300">TURNO ACTUAL:</p>
                 <p id="currentTurnInfo" class="text-2xl font-bold text-white">Cargando...</p>
                 <p id="currentTileInfo" class="text-sm text-indigo-400 mt-1"></p>
             </div>
 
-            <!-- Leyenda de Casillas (Ahora como lista vertical) -->
             <h2 class="text-xl font-semibold text-white mb-3">Índice de Casillas (Leyenda)</h2>
             <div id="tileLegend" class="flex flex-col space-y-3 bg-gray-700 p-4 rounded-lg mb-6">
-                <!-- La leyenda se genera aquí por JS -->
-            </div>
+                </div>
 
-            <!-- Visualización del Tablero -->
             <h2 id="boardTitle" class="text-xl font-semibold text-white mb-3"></h2>
             <div id="boardPath" class="board-path">
-                <!-- Tiles se generan aquí por JS -->
-            </div>
+                </div>
 
-            <!-- Log de Eventos -->
             <h2 class="text-xl font-semibold text-white mt-6 mb-3 border-t border-gray-700 pt-3">Registro de Eventos</h2>
             <div id="eventLog" class="bg-gray-700 p-4 rounded-lg h-48 overflow-y-auto text-sm text-gray-200">
-                <!-- Log entries se añaden aquí -->
                 <p class="log-info">Esperando a que el juego inicie...</p>
             </div>
         </div>
 
-        <!-- COLUMNA LATERAL (Controles y Scoreboard) -->
         <div class="lg:order-2 order-1 bg-gray-700 p-6 rounded-xl shadow-2xl sticky top-4">
             
-            <!-- Botón de Inicio/Dado -->
             <div id="actionPanel" class="text-center mb-6">
                 <button id="mainActionButton" onclick="handleMainAction()" class="w-full bg-red-600 hover:bg-red-700 text-white font-extrabold py-4 rounded-xl shadow-lg transition ease-in-out text-lg btn-restart">
                     Conectar e Iniciar Juego
                 </button>
             </div>
 
-            <!-- Sección de Decisiones (Oculta al inicio) -->
             <div id="decisionSection" class="mb-6 hidden">
                 <p id="decisionTitle" class="text-lg font-bold text-yellow-300 mb-3 border-b border-yellow-800 pb-1">Toma tu Decisión:</p>
                 <p id="riskDetails" class="text-sm text-gray-200 mb-3"></p>
                 <div class="grid grid-cols-2 gap-3">
-                    <!-- Botones de decisión para Riesgo Crítico (R) -->
                     <button id="btnMitigar" onclick="handleDecision('Mitigar')" class="btn-decision bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-2 rounded-lg text-sm transition-transform hover:scale-105">Mitigar (+200€, +1T)</button>
                     <button id="btnTransferir" onclick="handleDecision('Transferir')" class="btn-decision bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-2 rounded-lg text-sm transition-transform hover:scale-105">Transferir (+100€, Máx I=1)</button>
                     <button id="btnAsumir" onclick="handleDecision('Asumir')" class="btn-decision bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-2 rounded-lg text-sm transition-transform hover:scale-105">Asumir (0€, I Completo)</button>
                     <button id="btnIgnorar" onclick="handleDecision('Ignorar')" class="btn-decision bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-2 rounded-lg text-sm transition-transform hover:scale-105">Ignorar (0€, +2I, +2T)</button>
                 </div>
-                <!-- Botón de decisión para Oportunidad (O) -->
                 <button id="btnAceptarOportunidad" onclick="handleDecision('Aceptar Oportunidad')" class="btn-decision bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-2 rounded-lg text-sm transition-transform hover:scale-105 mt-4 hidden">Aceptar Oportunidad</button>
                 <button id="btnRechazarOportunidad" onclick="handleDecision('Rechazar Oportunidad')" class="btn-decision bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-2 rounded-lg text-sm transition-transform hover:scale-105 mt-4 hidden">Rechazar (Seguir)</button>
             </div>
 
-            <!-- Scoreboard -->
             <h2 class="text-xl font-semibold text-white mt-6 mb-3 border-t border-gray-600 pt-3">Scoreboard y Puntuación</h2>
             <div id="scoreboard" class="space-y-3">
-                <!-- Teams status here -->
-            </div>
+                </div>
         </div>
     </div>
     
-    <!-- Modal de Notificaciones General -->
     <div id="notificationModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 modal-transition hidden-modal">
         <div class="bg-gray-900 p-8 rounded-xl shadow-2xl text-center w-full max-w-md modal-transition">
             <p id="modalTitle" class="text-2xl font-bold text-indigo-400 mb-4">Notificación</p>
             
-            <!-- Contenido Dinámico -->
             <div id="modalContent">
-                <!-- Icono del Dado o Acción -->
                 <i id="modalIcon" class="fas text-7xl text-white mb-4"></i>
                 <p id="modalText" class="text-xl text-gray-200">...</p>
                 
-                <!-- Ruleta de Ocurrencia (Se muestra solo para el resultado del riesgo) -->
                 <div id="rouletteResult" class="hidden">
                     <p class="text-md text-gray-400 mt-4">Chequeando Ocurrencia...</p>
                     <div id="rouletteVisual" class="roulette-box bg-gray-800 text-white border-2 border-dashed border-white/50">
@@ -225,7 +203,6 @@
         </div>
     </div>
 
-    <!-- SCRIPT PRINCIPAL DEL JUEGO (type="module" para Firebase) -->
     <script type="module">
         // --- FIREBASE IMPORTS ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -300,8 +277,9 @@
         // --- FIREBASE AND GAME STATE ---
         let db, auth;
         let userId;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const gameRefPath = `artifacts/${appId}/public/data/riskopolyGames/game_state`;
+        // La ruta de la base de datos se simplifica para un uso genérico en GitHub.
+        // REQUIERE CONFIGURAR REGLAS DE SEGURIDAD de Firestore para 'riskopolyGames/game_state'.
+        const gameRefPath = `riskopolyGames/game_state`; 
 
         let gameState = {
             isGameRunning: false,
@@ -401,31 +379,50 @@
         async function initializeFirebase() {
             try {
                 setLogLevel('Debug');
-                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                
+                // === INSTRUCCIONES CLAVE PARA GITHUB PAGES: ===
+                // 1. Necesitas configurar un proyecto en Firebase (Firestore).
+                // 2. REEMPLAZA los valores a continuación con tu propia configuración.
+                // 3. Configura las reglas de seguridad de Firestore para permitir
+                //    la lectura y escritura anónima en la ruta 'riskopolyGames/game_state'.
+                const firebaseConfig = {
+                    apiKey: "TU_API_KEY_AQUI", 
+                    authDomain: "TU_AUTH_DOMAIN_AQUI",
+                    projectId: "TU_PROJECT_ID_AQUI", 
+                    storageBucket: "TU_STORAGE_BUCKET_AQUI",
+                    messagingSenderId: "TU_MESSAGING_SENDER_ID_AQUI",
+                    appId: "TU_APP_ID_AQUI"
+                };
+                
+                // Verifica si el usuario ha modificado la configuración
+                if (firebaseConfig.apiKey === "TU_API_KEY_AQUI") {
+                     throw new Error("Configuración de Firebase no proporcionada o incompleta.");
+                }
+
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
 
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                // Autenticación anónima para que todos los jugadores se sincronicen
+                await signInAnonymously(auth);
                 
                 userId = auth.currentUser.uid;
-                await logEvent(`Conexión exitosa. Tu ID: ${userId.substring(0, 8)}...`, 'info');
+                await logEvent(`Conexión exitosa a Firebase. Tu ID: ${userId.substring(0, 8)}...`, 'info');
                 
                 await setupGameStateListener();
             } catch (error) {
-                console.error("Error al inicializar Firebase:", error);
-                await logEvent(`Error crítico de conexión: ${error.message}`, 'error');
-                renderLog(); 
+                console.error("Error al inicializar Firebase. El juego funcionará LOCALMENTE (sin sync):", error);
+                await logEvent(`Error de conexión a Firebase: ${error.message}. El juego funcionará LOCALMENTE, no habrá sincronización.`, 'error');
+                
+                // Si falla la conexión, asegurar que `db` sea null para evitar intentar guardar el estado
+                db = null; 
+                await initializeNewGame();
             }
         }
         
         async function setupGameStateListener() {
+            if (!db) return; // No escuchar si no hay DB
+            
             const gameRef = doc(db, gameRefPath);
 
             const docSnap = await getDoc(gameRef);
@@ -476,14 +473,19 @@
                 activeOpportunity: null
             };
 
-            const gameRef = doc(db, gameRefPath);
-            await setDoc(gameRef, initialGameState);
+            if (db) {
+                 const gameRef = doc(db, gameRefPath);
+                 await setDoc(gameRef, initialGameState);
+            } else {
+                 await logEvent("No hay conexión a Firebase. El estado se mantiene en la sesión local.", 'warning');
+            }
+
             gameState = initialGameState;
             renderGame();
         }
 
         async function updateGameState() {
-            if (!db) return; 
+            if (!db) return; // No guardar si no hay DB
             const gameRef = doc(db, gameRefPath);
             try {
                 // Solo guardar propiedades esenciales y primitivas para la sincronización
@@ -503,7 +505,7 @@
         }
 
         // --- RENDERIZADO DEL JUEGO ---
-
+// ... (El resto de las funciones de renderizado y lógica del juego son las mismas) ...
         function renderGame() {
             renderLegend(); 
             renderBoard();
